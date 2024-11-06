@@ -2,18 +2,22 @@ package com.example.todofinal
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
+import androidx.compose.ui.platform.LocalContext
 
 data class TodoListData(val id: Int, val name: String)
 
@@ -26,6 +30,7 @@ class MainActivity : ComponentActivity() {
 
         addListLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
+                Log.d("MainActivity", "Received RESULT_OK from AddTodoListActivity, reloading data")
                 loadTodoLists()
             }
         }
@@ -66,26 +71,23 @@ fun TodoListApp(
     todoLists: List<TodoListData>,
     onAddTodoListClicked: () -> Unit
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Todo Lists", style = MaterialTheme.typography.headlineMedium)
+    val context = LocalContext.current
 
-        if (todoLists.isNotEmpty()) {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(todoLists) { list ->
-                    Row(modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                    ) {
-                        Text(text = list.name)
-                    }
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Todo Lists", style = MaterialTheme.typography.headlineMedium)
+
+            if (todoLists.isNotEmpty()) {
+                todoLists.forEach { list ->
+                    Text(text = list.name, modifier = Modifier.padding(8.dp))
                 }
+            } else {
+                Text(text = "No todo lists yet.")
             }
-        } else {
-            Text(text = "No todo lists yet.")
-        }
 
-        Button(onClick = onAddTodoListClicked, modifier = Modifier.padding(top = 16.dp)) {
-            Text("Add New Todo List")
+            Button(onClick = { onAddTodoListClicked() }, modifier = Modifier.padding(top = 16.dp)) {
+                Text("Add New Todo List")
+            }
         }
     }
 }

@@ -3,26 +3,86 @@ package com.example.todofinal
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import android.util.Log
 
 class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
         private const val DATABASE_NAME = "todolist.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 4
         const val TABLE_TODO_LIST = "todolist"
+        const val TABLE_TODO_ITEM = "todoitem"
         const val COLUMN_ID = "_id"
         const val COLUMN_NAME = "name"
+        const val COLUMN_LIST_ID = "list_id"
+        const val COLUMN_ITEM_NAME = "item_name"
+        const val COLUMN_DUE_DATE = "due_date"
+        const val COLUMN_COMPLETED = "completed"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
         val createTodoListTable = "CREATE TABLE $TABLE_TODO_LIST (" +
                 "$COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "$COLUMN_NAME TEXT NOT NULL);"
+
+        val createTodoItemTable = "CREATE TABLE $TABLE_TODO_ITEM (" +
+                "$COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "$COLUMN_ITEM_NAME TEXT NOT NULL, " +
+                "$COLUMN_DUE_DATE TEXT, " +
+                "$COLUMN_LIST_ID INTEGER, " +
+                "$COLUMN_COMPLETED INTEGER DEFAULT 0, " +  // Default value for completed is 0 (false)
+                "FOREIGN KEY($COLUMN_LIST_ID) REFERENCES $TABLE_TODO_LIST($COLUMN_ID) ON DELETE CASCADE);"
+
         db.execSQL(createTodoListTable)
+        db.execSQL(createTodoItemTable)
+
+        Log.d("TodoDatabaseHelper", "Database tables created with due_date and completed columns.")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_TODO_ITEM")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_TODO_LIST")
         onCreate(db)
+    }
+
+    fun isListNameDuplicate(listName: String): Boolean {
+        val db = readableDatabase
+        val cursor = db.rawQuery(
+            "SELECT COUNT(*) FROM $TABLE_TODO_LIST WHERE $COLUMN_NAME = ?",
+            arrayOf(listName)
+        )
+        cursor.moveToFirst()
+        val count = cursor.getInt(0)
+        cursor.close()
+        db.close()
+        return count > 0
+    }
+
+    fun getItemCountsForList(listId: Int): Pair<Int, Int> {
+        val db = readableDatabase
+        var totalItems = 0
+        var completedItems = 0
+
+
+        val totalCursor = db.rawQuery(
+            "SELECT COUNT(*) FROM $TABLE_TODO_ITEM WHERE $COLUMN_LIST_ID = ?",
+            arrayOf(listId.toString())
+        )
+        if (totalCursor.moveToFirst()) {
+            totalItems = totalCursor.getInt(0)
+        }
+        totalCursor.close()
+
+        val completedCursor = db.rawQuery(
+            "SELECT COUNT(*) FROM $TABLE_TODO_ITEM WHERE $COLUMN_LIST_ID = ? AND $COLUMN_COMPLETED = 1",
+            arrayOf(listId.toString())
+        )
+        if (completedCursor.moveToFirst()) {
+            completedItems = completedCursor.getInt(0)
+        }
+        completedCursor.close()
+        db.close()
+
+        return Pair(totalItems, completedItems)
     }
 }

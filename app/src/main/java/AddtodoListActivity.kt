@@ -8,8 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -26,6 +26,7 @@ class AddTodoListActivity : ComponentActivity() {
                     if (isListNameDuplicate(dbHelper, listName)) {
                         Toast.makeText(this, "A Todo List with this name already exists", Toast.LENGTH_SHORT).show()
                     } else {
+
                         val values = ContentValues().apply {
                             put(TodoDatabaseHelper.COLUMN_NAME, listName)
                         }
@@ -47,6 +48,7 @@ class AddTodoListActivity : ComponentActivity() {
             }
         }
     }
+
 
     private fun isListNameDuplicate(dbHelper: TodoDatabaseHelper, listName: String): Boolean {
         val db = dbHelper.readableDatabase
