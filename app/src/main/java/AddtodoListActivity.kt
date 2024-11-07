@@ -21,19 +21,13 @@ class AddTodoListActivity : ComponentActivity() {
             AddTodoListScreen { listName ->
                 if (listName.isNotBlank()) {
                     val dbHelper = TodoDatabaseHelper(this)
-                    val db = dbHelper.readableDatabase
-
-                    if (isListNameDuplicate(dbHelper, listName)) {
+                    if (dbHelper.isListNameDuplicate(listName)) {
                         Toast.makeText(this, "A Todo List with this name already exists", Toast.LENGTH_SHORT).show()
                     } else {
-
                         val values = ContentValues().apply {
                             put(TodoDatabaseHelper.COLUMN_NAME, listName)
                         }
-
-                        val result = db.insert(TodoDatabaseHelper.TABLE_TODO_LIST, null, values)
-                        db.close()
-
+                        val result = dbHelper.writableDatabase.insert(TodoDatabaseHelper.TABLE_TODO_LIST, null, values)
                         if (result != -1L) {
                             Toast.makeText(this, "Todo List Added", Toast.LENGTH_SHORT).show()
                             setResult(RESULT_OK)
@@ -48,20 +42,6 @@ class AddTodoListActivity : ComponentActivity() {
             }
         }
     }
-
-
-    private fun isListNameDuplicate(dbHelper: TodoDatabaseHelper, listName: String): Boolean {
-        val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery(
-            "SELECT COUNT(*) FROM ${TodoDatabaseHelper.TABLE_TODO_LIST} WHERE ${TodoDatabaseHelper.COLUMN_NAME} = ?",
-            arrayOf(listName)
-        )
-        cursor.moveToFirst()
-        val count = cursor.getInt(0)
-        cursor.close()
-        db.close()
-        return count > 0
-    }
 }
 
 @Composable
@@ -74,7 +54,6 @@ fun AddTodoListScreen(onSaveClick: (String) -> Unit) {
             onValueChange = { listName = it },
             label = { Text("Todo List Name") }
         )
-
         Button(
             onClick = { onSaveClick(listName) },
             modifier = Modifier.padding(top = 16.dp)

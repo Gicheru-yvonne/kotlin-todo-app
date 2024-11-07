@@ -1,5 +1,6 @@
 package com.example.todofinal
 
+
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
@@ -24,19 +25,17 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         val createTodoListTable = "CREATE TABLE $TABLE_TODO_LIST (" +
                 "$COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "$COLUMN_NAME TEXT NOT NULL);"
-
         val createTodoItemTable = "CREATE TABLE $TABLE_TODO_ITEM (" +
                 "$COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "$COLUMN_ITEM_NAME TEXT NOT NULL, " +
                 "$COLUMN_DUE_DATE TEXT, " +
                 "$COLUMN_LIST_ID INTEGER, " +
-                "$COLUMN_COMPLETED INTEGER DEFAULT 0, " +  // Default value for completed is 0 (false)
+                "$COLUMN_COMPLETED INTEGER DEFAULT 0, " +
                 "FOREIGN KEY($COLUMN_LIST_ID) REFERENCES $TABLE_TODO_LIST($COLUMN_ID) ON DELETE CASCADE);"
 
         db.execSQL(createTodoListTable)
         db.execSQL(createTodoItemTable)
-
-        Log.d("TodoDatabaseHelper", "Database tables created with due_date and completed columns.")
+        Log.d("TodoDatabaseHelper", "Database tables created.")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -62,7 +61,6 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         val db = readableDatabase
         var totalItems = 0
         var completedItems = 0
-
 
         val totalCursor = db.rawQuery(
             "SELECT COUNT(*) FROM $TABLE_TODO_ITEM WHERE $COLUMN_LIST_ID = ?",
