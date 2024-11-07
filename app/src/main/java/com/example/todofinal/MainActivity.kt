@@ -1,5 +1,6 @@
 package com.example.todofinal
 
+import android.content.ContentValues
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -18,8 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-
-
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 
 data class TodoItem(
     val name: String,
@@ -40,7 +42,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-
         addListLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 loadTodoLists()
@@ -55,19 +56,21 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-
         setContent {
             TodoListApp(
                 todoLists = todoLists,
                 todoItems = todoItems,
                 onAddTodoListClicked = {
-                    val intent = Intent(this, AddTodoListActivity::class.java)
+                    val intent = Intent(this@MainActivity, AddTodoListActivity::class.java)
                     addListLauncher.launch(intent)
                 },
                 onAddTodoItemClicked = { listId ->
-                    val intent = Intent(this, AddTodoItemActivity::class.java)
+                    val intent = Intent(this@MainActivity, AddTodoItemActivity::class.java)
                     intent.putExtra("list_id", listId)
                     addItemLauncher.launch(intent)
+                },
+                onToggleItemCompletion = { itemName, listId, isCompleted ->
+                    toggleItemCompletion(itemName, listId, isCompleted)
                 }
             )
         }
@@ -76,9 +79,27 @@ class MainActivity : ComponentActivity() {
         loadTodoItems()
     }
 
+    internal fun toggleItemCompletion(itemName: String, listId: String, isCompleted: Boolean) {
+        val dbHelper = TodoDatabaseHelper(this@MainActivity)
+        val db = dbHelper.writableDatabase
+
+        val values = ContentValues().apply {
+            put(TodoDatabaseHelper.COLUMN_COMPLETED, if (isCompleted) 1 else 0)
+        }
+
+        db.update(
+            TodoDatabaseHelper.TABLE_TODO_ITEM,
+            values,
+            "${TodoDatabaseHelper.COLUMN_ITEM_NAME} = ? AND ${TodoDatabaseHelper.COLUMN_LIST_ID} = ?",
+            arrayOf(itemName, listId)
+        )
+        db.close()
+
+        loadTodoItems()
+    }
 
     internal fun loadTodoLists() {
-        val dbHelper = TodoDatabaseHelper(this)
+        val dbHelper = TodoDatabaseHelper(this@MainActivity)
         val db = dbHelper.readableDatabase
         val cursor = db.rawQuery(
             "SELECT ${TodoDatabaseHelper.COLUMN_ID}, ${TodoDatabaseHelper.COLUMN_NAME} FROM ${TodoDatabaseHelper.TABLE_TODO_LIST}",
@@ -99,7 +120,7 @@ class MainActivity : ComponentActivity() {
     }
 
     internal fun loadTodoItems() {
-        val dbHelper = TodoDatabaseHelper(this)
+        val dbHelper = TodoDatabaseHelper(this@MainActivity)
         val db = dbHelper.readableDatabase
         val cursor = db.rawQuery(
             "SELECT ${TodoDatabaseHelper.COLUMN_ITEM_NAME}, ${TodoDatabaseHelper.COLUMN_LIST_ID}, ${TodoDatabaseHelper.COLUMN_DUE_DATE}, ${TodoDatabaseHelper.COLUMN_COMPLETED} FROM ${TodoDatabaseHelper.TABLE_TODO_ITEM}",
@@ -119,7 +140,6 @@ class MainActivity : ComponentActivity() {
 
         todoItems = items
     }
-
 }
 
 @Composable
@@ -127,12 +147,12 @@ fun TodoListApp(
     todoLists: List<TodoListData>,
     todoItems: List<TodoItem>,
     onAddTodoListClicked: () -> Unit,
-    onAddTodoItemClicked: (Int) -> Unit
+    onAddTodoItemClicked: (Int) -> Unit,
+    onToggleItemCompletion: (String, String, Boolean) -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Todo Lists", style = MaterialTheme.typography.headlineMedium)
-
 
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(todoLists) { list ->
@@ -141,10 +161,18 @@ fun TodoListApp(
                         Text(text = "Items: ${list.itemCount}, Completed: ${list.completedCount}")
 
                         todoItems.filter { it.listId == list.id.toString() }.forEach { item ->
-                            Text(
-                                text = "- ${item.name} (Due: ${item.dueDate ?: "No due date"})",
-                                modifier = Modifier.padding(start = 16.dp)
-                            )
+                            Row(modifier = Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = item.isCompleted,
+                                    onCheckedChange = { isChecked ->
+                                        onToggleItemCompletion(item.name, item.listId, isChecked)
+                                    }
+                                )
+                                Text(
+                                    text = "${item.name} (Due: ${item.dueDate ?: "No due date"})",
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
+                            }
                         }
 
                         Button(onClick = { onAddTodoItemClicked(list.id) }, modifier = Modifier.padding(top = 8.dp)) {
@@ -153,7 +181,6 @@ fun TodoListApp(
                     }
                 }
             }
-
 
             Button(onClick = onAddTodoListClicked, modifier = Modifier.padding(top = 16.dp)) {
                 Text("Add New Todo List")
