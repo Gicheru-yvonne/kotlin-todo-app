@@ -2,7 +2,6 @@ package com.example.todofinal
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
@@ -17,11 +16,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
-import com.example.todofinal.com.example.todofinal.AddTodoItemActivity
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 
-// Define TodoItem and TodoListData data classes
-data class TodoItem(val name: String, val listId: String, val dueDate: String?, val isCompleted: Boolean)
+
+
+data class TodoItem(
+    val name: String,
+    val listId: String,
+    val dueDate: String?,
+    val isCompleted: Boolean
+)
+
 data class TodoListData(val id: Int, val name: String, val itemCount: Int, val completedCount: Int)
 
 class MainActivity : ComponentActivity() {
@@ -34,17 +40,21 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Register the launchers for adding a new list and items
+
         addListLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 loadTodoLists()
-            }
-        }
-        addItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == RESULT_OK) {
                 loadTodoItems()
             }
         }
+
+        addItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                loadTodoItems()
+                loadTodoLists()
+            }
+        }
+
 
         setContent {
             TodoListApp(
@@ -66,11 +76,14 @@ class MainActivity : ComponentActivity() {
         loadTodoItems()
     }
 
-    // Load todo lists from the database
+
     internal fun loadTodoLists() {
         val dbHelper = TodoDatabaseHelper(this)
         val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery("SELECT ${TodoDatabaseHelper.COLUMN_ID}, ${TodoDatabaseHelper.COLUMN_NAME} FROM ${TodoDatabaseHelper.TABLE_TODO_LIST}", null)
+        val cursor = db.rawQuery(
+            "SELECT ${TodoDatabaseHelper.COLUMN_ID}, ${TodoDatabaseHelper.COLUMN_NAME} FROM ${TodoDatabaseHelper.TABLE_TODO_LIST}",
+            null
+        )
 
         val lists = mutableListOf<TodoListData>()
         while (cursor.moveToNext()) {
@@ -85,11 +98,13 @@ class MainActivity : ComponentActivity() {
         todoLists = lists
     }
 
-    // Load todo items from the database
     internal fun loadTodoItems() {
         val dbHelper = TodoDatabaseHelper(this)
         val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery("SELECT ${TodoDatabaseHelper.COLUMN_ITEM_NAME}, ${TodoDatabaseHelper.COLUMN_LIST_ID}, ${TodoDatabaseHelper.COLUMN_DUE_DATE}, ${TodoDatabaseHelper.COLUMN_COMPLETED} FROM ${TodoDatabaseHelper.TABLE_TODO_ITEM}", null)
+        val cursor = db.rawQuery(
+            "SELECT ${TodoDatabaseHelper.COLUMN_ITEM_NAME}, ${TodoDatabaseHelper.COLUMN_LIST_ID}, ${TodoDatabaseHelper.COLUMN_DUE_DATE}, ${TodoDatabaseHelper.COLUMN_COMPLETED} FROM ${TodoDatabaseHelper.TABLE_TODO_ITEM}",
+            null
+        )
 
         val items = mutableListOf<TodoItem>()
         while (cursor.moveToNext()) {
@@ -104,6 +119,7 @@ class MainActivity : ComponentActivity() {
 
         todoItems = items
     }
+
 }
 
 @Composable
@@ -117,19 +133,27 @@ fun TodoListApp(
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Todo Lists", style = MaterialTheme.typography.headlineMedium)
 
-            if (todoLists.isNotEmpty()) {
-                todoLists.forEach { list ->
+
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(todoLists) { list ->
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text(text = list.name)
                         Text(text = "Items: ${list.itemCount}, Completed: ${list.completedCount}")
-                        Button(onClick = { onAddTodoItemClicked(list.id) }) {
+
+                        todoItems.filter { it.listId == list.id.toString() }.forEach { item ->
+                            Text(
+                                text = "- ${item.name} (Due: ${item.dueDate ?: "No due date"})",
+                                modifier = Modifier.padding(start = 16.dp)
+                            )
+                        }
+
+                        Button(onClick = { onAddTodoItemClicked(list.id) }, modifier = Modifier.padding(top = 8.dp)) {
                             Text("Add Item")
                         }
                     }
                 }
-            } else {
-                Text(text = "No todo lists yet.")
             }
+
 
             Button(onClick = onAddTodoListClicked, modifier = Modifier.padding(top = 16.dp)) {
                 Text("Add New Todo List")

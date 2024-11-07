@@ -1,5 +1,6 @@
-package com.example.todofinal.com.example.todofinal
+package com.example.todofinal
 
+import android.app.DatePickerDialog
 import android.content.ContentValues
 import android.os.Bundle
 import android.widget.Toast
@@ -12,8 +13,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.todofinal.TodoDatabaseHelper
+import java.util.*
 
 class AddTodoItemActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,8 +50,22 @@ class AddTodoItemActivity : ComponentActivity() {
 
 @Composable
 fun AddTodoItemScreen(onSaveClick: (String, String) -> Unit) {
+    val context = LocalContext.current
     var itemName by remember { mutableStateOf("") }
     var dueDate by remember { mutableStateOf("") }
+    val calendar = Calendar.getInstance()
+
+    val datePickerDialog = DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            dueDate = "$year-${month + 1}-$dayOfMonth"
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    ).apply {
+        datePicker.minDate = Calendar.getInstance().timeInMillis
+    }
 
     Column(modifier = Modifier.padding(16.dp)) {
         OutlinedTextField(
@@ -59,9 +75,17 @@ fun AddTodoItemScreen(onSaveClick: (String, String) -> Unit) {
         )
         OutlinedTextField(
             value = dueDate,
-            onValueChange = { dueDate = it },
-            label = { Text("Due Date (optional)") }
+            onValueChange = {},
+            label = { Text("Due Date (Optional)") },
+            enabled = false,
+            modifier = Modifier.padding(top = 16.dp)
         )
+        Button(
+            onClick = { datePickerDialog.show() },
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Text("Select Due Date")
+        }
         Button(
             onClick = { onSaveClick(itemName, dueDate) },
             modifier = Modifier.padding(top = 16.dp)
