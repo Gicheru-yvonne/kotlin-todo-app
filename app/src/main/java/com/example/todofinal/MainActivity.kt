@@ -3,6 +3,7 @@ package com.example.todofinal
 import android.content.ContentValues
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
@@ -10,20 +11,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Checkbox
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 
 data class TodoItem(
+    val id: Int,
     val name: String,
     val listId: String,
     val dueDate: String?,
@@ -38,6 +39,8 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var addListLauncher: ActivityResultLauncher<Intent>
     private lateinit var addItemLauncher: ActivityResultLauncher<Intent>
+    private lateinit var editListLauncher: ActivityResultLauncher<Intent>
+    private lateinit var editItemLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,14 +48,24 @@ class MainActivity : ComponentActivity() {
         addListLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 loadTodoLists()
-                loadTodoItems()
             }
         }
 
         addItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 loadTodoItems()
+            }
+        }
+
+        editListLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
                 loadTodoLists()
+            }
+        }
+
+        editItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                loadTodoItems()
             }
         }
 
@@ -69,8 +82,21 @@ class MainActivity : ComponentActivity() {
                     intent.putExtra("list_id", listId)
                     addItemLauncher.launch(intent)
                 },
-                onToggleItemCompletion = { itemName, listId, isCompleted ->
-                    toggleItemCompletion(itemName, listId, isCompleted)
+                onEditTodoListClicked = { listId, currentName ->
+                    val intent = Intent(this@MainActivity, EditTodoListActivity::class.java)
+                    intent.putExtra("list_id", listId)
+                    intent.putExtra("current_name", currentName)
+                    editListLauncher.launch(intent)
+                },
+                onEditTodoItemClicked = { itemId, itemName, dueDate ->
+                    val intent = Intent(this@MainActivity, EditTodoItemActivity::class.java)
+                    intent.putExtra("item_id", itemId)
+                    intent.putExtra("item_name", itemName)
+                    intent.putExtra("due_date", dueDate)
+                    editItemLauncher.launch(intent)
+                },
+                onToggleItemCompletion = { itemId, isCompleted ->
+                    toggleItemCompletion(itemId, isCompleted)
                 }
             )
         }
@@ -79,66 +105,95 @@ class MainActivity : ComponentActivity() {
         loadTodoItems()
     }
 
-    internal fun toggleItemCompletion(itemName: String, listId: String, isCompleted: Boolean) {
-        val dbHelper = TodoDatabaseHelper(this@MainActivity)
-        val db = dbHelper.writableDatabase
+    internal fun toggleItemCompletion(itemId: Int, isCompleted: Boolean) {
+        try {
+            val dbHelper = TodoDatabaseHelper(this@MainActivity)
+            val db = dbHelper.writableDatabase
 
-        val values = ContentValues().apply {
-            put(TodoDatabaseHelper.COLUMN_COMPLETED, if (isCompleted) 1 else 0)
+            val values = ContentValues().apply {
+                put(TodoDatabaseHelper.COLUMN_COMPLETED, if (isCompleted) 1 else 0)
+            }
+
+            val rowsAffected = db.update(
+                TodoDatabaseHelper.TABLE_TODO_ITEM,
+                values,
+                "${TodoDatabaseHelper.COLUMN_ID} = ?",
+                arrayOf(itemId.toString())
+            )
+            db.close()
+
+            if (rowsAffected > 0) {
+                Log.d("MainActivity", "Updated item ID: $itemId, completed: $isCompleted")
+            } else {
+                Log.w("MainActivity", "No rows updated for item ID: $itemId")
+            }
+
+            loadTodoItems()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error toggling item completion: ${e.message}")
         }
-
-        db.update(
-            TodoDatabaseHelper.TABLE_TODO_ITEM,
-            values,
-            "${TodoDatabaseHelper.COLUMN_ITEM_NAME} = ? AND ${TodoDatabaseHelper.COLUMN_LIST_ID} = ?",
-            arrayOf(itemName, listId)
-        )
-        db.close()
-
-        loadTodoItems()
     }
 
     internal fun loadTodoLists() {
-        val dbHelper = TodoDatabaseHelper(this@MainActivity)
-        val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery(
-            "SELECT ${TodoDatabaseHelper.COLUMN_ID}, ${TodoDatabaseHelper.COLUMN_NAME} FROM ${TodoDatabaseHelper.TABLE_TODO_LIST}",
-            null
-        )
+        try {
+            val dbHelper = TodoDatabaseHelper(this@MainActivity)
+            val db = dbHelper.readableDatabase
+            val cursor = db.rawQuery(
+                "SELECT ${TodoDatabaseHelper.COLUMN_ID}, ${TodoDatabaseHelper.COLUMN_NAME} FROM ${TodoDatabaseHelper.TABLE_TODO_LIST}",
+                null
+            )
 
-        val lists = mutableListOf<TodoListData>()
-        while (cursor.moveToNext()) {
-            val id = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
-            val name = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_NAME))
-            val counts = dbHelper.getItemCountsForList(id)
-            lists.add(TodoListData(id, name, counts.first, counts.second))
+            val lists = mutableListOf<TodoListData>()
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    val id = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
+                    val name = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_NAME))
+                    val counts = dbHelper.getItemCountsForList(id)
+                    lists.add(TodoListData(id, name, counts.first, counts.second))
+                }
+                cursor.close()
+            } else {
+                Log.e("MainActivity", "Cursor is null while loading todo lists")
+            }
+            db.close()
+
+            todoLists = lists
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error loading todo lists: ${e.message}")
         }
-        cursor.close()
-        db.close()
-
-        todoLists = lists
     }
 
     internal fun loadTodoItems() {
-        val dbHelper = TodoDatabaseHelper(this@MainActivity)
-        val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery(
-            "SELECT ${TodoDatabaseHelper.COLUMN_ITEM_NAME}, ${TodoDatabaseHelper.COLUMN_LIST_ID}, ${TodoDatabaseHelper.COLUMN_DUE_DATE}, ${TodoDatabaseHelper.COLUMN_COMPLETED} FROM ${TodoDatabaseHelper.TABLE_TODO_ITEM}",
-            null
-        )
+        try {
+            val dbHelper = TodoDatabaseHelper(this@MainActivity)
+            val db = dbHelper.readableDatabase
+            val cursor = db.rawQuery(
+                "SELECT ${TodoDatabaseHelper.COLUMN_ID}, ${TodoDatabaseHelper.COLUMN_ITEM_NAME}, ${TodoDatabaseHelper.COLUMN_LIST_ID}, ${TodoDatabaseHelper.COLUMN_DUE_DATE}, ${TodoDatabaseHelper.COLUMN_COMPLETED} FROM ${TodoDatabaseHelper.TABLE_TODO_ITEM}",
+                null
+            )
 
-        val items = mutableListOf<TodoItem>()
-        while (cursor.moveToNext()) {
-            val itemName = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ITEM_NAME))
-            val listId = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_LIST_ID))
-            val dueDate = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_DUE_DATE))
-            val isCompleted = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_COMPLETED)) == 1
-            items.add(TodoItem(itemName, listId, dueDate, isCompleted))
+            val items = mutableListOf<TodoItem>()
+            if (cursor != null) {
+                Log.d("MainActivity", "Cursor loaded with item count: ${cursor.count}")
+                while (cursor.moveToNext()) {
+                    val itemId = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
+                    val itemName = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ITEM_NAME)) ?: continue
+                    val listId = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_LIST_ID)) ?: continue
+                    val dueDate = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_DUE_DATE))
+                    val isCompleted = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_COMPLETED)) == 1
+
+                    items.add(TodoItem(itemId, itemName, listId, dueDate, isCompleted))
+                }
+                cursor.close()
+            } else {
+                Log.e("MainActivity", "Cursor is null while loading todo items")
+            }
+            db.close()
+
+            todoItems = items
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error loading todo items: ${e.message}")
         }
-        cursor.close()
-        db.close()
-
-        todoItems = items
     }
 }
 
@@ -148,7 +203,9 @@ fun TodoListApp(
     todoItems: List<TodoItem>,
     onAddTodoListClicked: () -> Unit,
     onAddTodoItemClicked: (Int) -> Unit,
-    onToggleItemCompletion: (String, String, Boolean) -> Unit
+    onEditTodoListClicked: (Int, String) -> Unit,
+    onEditTodoItemClicked: (Int, String, String?) -> Unit,
+    onToggleItemCompletion: (Int, Boolean) -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -157,21 +214,42 @@ fun TodoListApp(
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(todoLists) { list ->
                     Column(modifier = Modifier.padding(8.dp)) {
-                        Text(text = list.name)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = list.name)
+                            IconButton(onClick = { onEditTodoListClicked(list.id, list.name) }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Edit,
+                                    contentDescription = "Edit List",
+                                    tint = Color(0xFFFFC0CB)
+                                )
+                            }
+                        }
                         Text(text = "Items: ${list.itemCount}, Completed: ${list.completedCount}")
 
                         todoItems.filter { it.listId == list.id.toString() }.forEach { item ->
-                            Row(modifier = Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier.padding(start = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Checkbox(
                                     checked = item.isCompleted,
                                     onCheckedChange = { isChecked ->
-                                        onToggleItemCompletion(item.name, item.listId, isChecked)
+                                        onToggleItemCompletion(item.id, isChecked)
                                     }
                                 )
                                 Text(
                                     text = "${item.name} (Due: ${item.dueDate ?: "No due date"})",
                                     modifier = Modifier.padding(start = 8.dp)
                                 )
+                                IconButton(onClick = {
+                                    onEditTodoItemClicked(item.id, item.name, item.dueDate)
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Edit,
+                                        contentDescription = "Edit Item",
+                                        tint = Color(0xFFFFC0CB)
+                                    )
+                                }
                             }
                         }
 

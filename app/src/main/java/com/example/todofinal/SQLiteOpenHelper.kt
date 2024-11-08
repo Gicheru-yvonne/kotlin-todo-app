@@ -1,6 +1,5 @@
 package com.example.todofinal
-
-
+import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
@@ -82,5 +81,29 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         db.close()
 
         return Pair(totalItems, completedItems)
+    }
+
+    fun updateTodoItem(itemId: Int, newItemName: String, newDueDate: String?): Boolean {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_ITEM_NAME, newItemName)
+            put(COLUMN_DUE_DATE, newDueDate)
+        }
+
+        val rowsAffected = db.update(
+            TABLE_TODO_ITEM,
+            values,
+            "$COLUMN_ID = ?",
+            arrayOf(itemId.toString())
+        )
+        db.close()
+
+        if (rowsAffected > 0) {
+            Log.d("TodoDatabaseHelper", "Successfully updated item: $newItemName with ID: $itemId")
+        } else {
+            Log.e("TodoDatabaseHelper", "Failed to update item with ID: $itemId")
+        }
+
+        return rowsAffected > 0
     }
 }

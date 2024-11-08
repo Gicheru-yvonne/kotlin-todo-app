@@ -1,7 +1,6 @@
 package com.example.todofinal
 
 import android.app.DatePickerDialog
-import android.content.ContentValues
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -17,56 +16,55 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import java.util.*
 
-class AddTodoItemActivity : ComponentActivity() {
+class EditTodoItemActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
 
-        val listId = intent.getIntExtra("list_id", -1)
-        if (listId == -1) {
-            Toast.makeText(this, "Invalid List ID", Toast.LENGTH_SHORT).show()
-            finish()
-            return
-        }
+        val itemId = intent.getIntExtra("item_id", -1)
+        val itemName = intent.getStringExtra("item_name") ?: ""
+        val dueDate = intent.getStringExtra("due_date") ?: ""
 
         setContent {
-            AddTodoItemScreen { itemName, dueDate ->
-                if (itemName.isNotBlank()) {
-
+            EditTodoItemScreen(itemName, dueDate) { newItemName, newDueDate ->
+                if (newItemName.isNotBlank()) {
                     val dbHelper = TodoDatabaseHelper(this)
-                    val db = dbHelper.writableDatabase
+                    val success = dbHelper.updateTodoItem(itemId, newItemName, newDueDate)
 
-                    val values = ContentValues().apply {
-                        put(TodoDatabaseHelper.COLUMN_ITEM_NAME, itemName)
-                        put(TodoDatabaseHelper.COLUMN_DUE_DATE, dueDate)
-                        put(TodoDatabaseHelper.COLUMN_LIST_ID, listId)
-                        put(TodoDatabaseHelper.COLUMN_COMPLETED, 0)
-                    }
-
-                    val result = db.insert(TodoDatabaseHelper.TABLE_TODO_ITEM, null, values)
-                    db.close()
-
-                    if (result != -1L) {
-                        Toast.makeText(this, "Todo item added successfully", Toast.LENGTH_SHORT).show()
+                    if (success) {
+                        Toast.makeText(this, "Todo Item Updated", Toast.LENGTH_SHORT).show()
                         setResult(RESULT_OK)
                         finish()
                     } else {
-                        Toast.makeText(this, "Failed to add todo item", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Failed to Update Todo Item", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    Toast.makeText(this, "Item Name cannot be empty", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Item name cannot be empty", Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 }
 
+
 @Composable
-fun AddTodoItemScreen(onSaveClick: (String, String) -> Unit) {
+fun EditTodoItemScreen(
+    itemName: String,
+    currentDueDate: String,
+    onSaveClick: (String, String) -> Unit
+) {
     val context = LocalContext.current
-    var itemName by remember { mutableStateOf("") }
-    var dueDate by remember { mutableStateOf("") }
+    var newItemName by remember { mutableStateOf(itemName) }
+    var dueDate by remember { mutableStateOf(currentDueDate) }
     val calendar = Calendar.getInstance()
+
+
+    if (currentDueDate.isNotBlank()) {
+        val parts = currentDueDate.split("-")
+        if (parts.size == 3) {
+            calendar.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt())
+        }
+    }
 
 
     val datePickerDialog = DatePickerDialog(
@@ -78,33 +76,43 @@ fun AddTodoItemScreen(onSaveClick: (String, String) -> Unit) {
         calendar.get(Calendar.MONTH),
         calendar.get(Calendar.DAY_OF_MONTH)
     ).apply {
+
         datePicker.minDate = Calendar.getInstance().timeInMillis
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
+
         OutlinedTextField(
-            value = itemName,
-            onValueChange = { itemName = it },
-            label = { Text("Item Name") }
+            value = newItemName,
+            onValueChange = { newItemName = it },
+            label = { Text("Todo Item Name") }
         )
+
+
         OutlinedTextField(
             value = dueDate,
             onValueChange = {},
-            label = { Text("Due Date (optional)") },
+            label = { Text("Due Date (Optional)") },
             enabled = false,
             modifier = Modifier.padding(top = 16.dp)
         )
+
+
         Button(
             onClick = { datePickerDialog.show() },
             modifier = Modifier.padding(top = 8.dp)
         ) {
             Text("Select Due Date")
         }
+
+
         Button(
-            onClick = { onSaveClick(itemName, dueDate) },
+            onClick = {
+                onSaveClick(newItemName, dueDate)
+            },
             modifier = Modifier.padding(top = 16.dp)
         ) {
-            Text("Save Item")
+            Text("Save Todo Item")
         }
     }
 }
