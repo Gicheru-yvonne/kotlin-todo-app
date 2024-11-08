@@ -106,4 +106,23 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
 
         return rowsAffected > 0
     }
+
+
+    fun deleteTodoItem(itemId: Int): Boolean {
+        val db = writableDatabase
+        val rowsAffected = db.delete(
+            TABLE_TODO_ITEM,
+            "$COLUMN_ID = ?",
+            arrayOf(itemId.toString())
+        )
+        db.close()
+
+        if (rowsAffected > 0) {
+            Log.d("TodoDatabaseHelper", "Successfully deleted item with ID: $itemId")
+        } else {
+            Log.e("TodoDatabaseHelper", "Failed to delete item with ID: $itemId")
+        }
+
+        return rowsAffected > 0
+    }
 }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -97,6 +98,9 @@ class MainActivity : ComponentActivity() {
                 },
                 onToggleItemCompletion = { itemId, isCompleted ->
                     toggleItemCompletion(itemId, isCompleted)
+                },
+                onDeleteTodoItemClicked = { itemId ->
+                    deleteTodoItem(itemId)
                 }
             )
         }
@@ -131,6 +135,23 @@ class MainActivity : ComponentActivity() {
             loadTodoItems()
         } catch (e: Exception) {
             Log.e("MainActivity", "Error toggling item completion: ${e.message}")
+        }
+    }
+
+    internal fun deleteTodoItem(itemId: Int) {
+        try {
+            val dbHelper = TodoDatabaseHelper(this@MainActivity)
+            val isDeleted = dbHelper.deleteTodoItem(itemId)
+
+            if (isDeleted) {
+                Log.d("MainActivity", "Deleted item with ID: $itemId")
+            } else {
+                Log.w("MainActivity", "No item deleted for ID: $itemId")
+            }
+
+            loadTodoItems()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error deleting item: ${e.message}")
         }
     }
 
@@ -205,7 +226,8 @@ fun TodoListApp(
     onAddTodoItemClicked: (Int) -> Unit,
     onEditTodoListClicked: (Int, String) -> Unit,
     onEditTodoItemClicked: (Int, String, String?) -> Unit,
-    onToggleItemCompletion: (Int, Boolean) -> Unit
+    onToggleItemCompletion: (Int, Boolean) -> Unit,
+    onDeleteTodoItemClicked: (Int) -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -248,6 +270,15 @@ fun TodoListApp(
                                         imageVector = Icons.Filled.Edit,
                                         contentDescription = "Edit Item",
                                         tint = Color(0xFFFFC0CB)
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    onDeleteTodoItemClicked(item.id)
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Delete,
+                                        contentDescription = "Delete Item",
+                                        tint = Color.Red
                                     )
                                 }
                             }
