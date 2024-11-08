@@ -5,6 +5,8 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
+import java.text.SimpleDateFormat
+import java.util.*
 
 class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
@@ -45,6 +47,34 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
     }
 
 
+    fun getNearestDueDateForList(listId: Int): String? {
+        val db = readableDatabase
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        var nearestDate: Date? = null
+
+        val cursor = db.rawQuery(
+            "SELECT $COLUMN_DUE_DATE FROM $TABLE_TODO_ITEM WHERE $COLUMN_LIST_ID = ? AND $COLUMN_DUE_DATE IS NOT NULL",
+            arrayOf(listId.toString())
+        )
+
+        while (cursor.moveToNext()) {
+            val dueDateStr = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DUE_DATE))
+            try {
+                val dueDate = dateFormat.parse(dueDateStr)
+                if (dueDate != null && (nearestDate == null || dueDate.before(nearestDate))) {
+                    nearestDate = dueDate
+                }
+            } catch (e: Exception) {
+                Log.e("TodoDatabaseHelper", "Error parsing date: $dueDateStr", e)
+            }
+        }
+        cursor.close()
+        db.close()
+
+        return nearestDate?.let { dateFormat.format(it) }
+    }
+
+
     fun isListNameDuplicate(listName: String): Boolean {
         val db = readableDatabase
         val cursor = db.rawQuery(
@@ -60,7 +90,6 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         db.close()
         return isDuplicate
     }
-
 
     fun getItemCountsForList(listId: Int): Pair<Int, Int> {
         val db = readableDatabase
@@ -88,7 +117,6 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
 
         return Pair(totalItems, completedItems)
     }
-
 
     fun updateTodoItem(itemId: Int, newItemName: String, newDueDate: String?): Boolean {
         val db = writableDatabase
@@ -118,7 +146,6 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
             db.close()
         }
     }
-
 
     fun moveTodoItem(itemId: Int, newListId: Int): Boolean {
         val db = writableDatabase

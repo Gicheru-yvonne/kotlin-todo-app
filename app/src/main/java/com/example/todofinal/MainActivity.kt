@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+
 data class TodoItem(
     val id: Int,
     val name: String,
@@ -30,7 +31,13 @@ data class TodoItem(
     val isCompleted: Boolean
 )
 
-data class TodoListData(val id: Int, val name: String, val itemCount: Int, val completedCount: Int)
+data class TodoListData(
+    val id: Int,
+    val name: String,
+    val itemCount: Int,
+    val completedCount: Int,
+    val nearestDueDate: String?
+)
 
 class MainActivity : ComponentActivity() {
     private var todoLists by mutableStateOf(listOf<TodoListData>())
@@ -53,6 +60,7 @@ class MainActivity : ComponentActivity() {
         addItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 loadTodoItems()
+                loadTodoLists()
             }
         }
 
@@ -65,6 +73,7 @@ class MainActivity : ComponentActivity() {
         editItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
                 loadTodoItems()
+                loadTodoLists()
             }
         }
 
@@ -154,7 +163,8 @@ class MainActivity : ComponentActivity() {
                 val id = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
                 val name = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_NAME))
                 val counts = dbHelper.getItemCountsForList(id)
-                lists.add(TodoListData(id, name, counts.first, counts.second))
+                val nearestDueDate = dbHelper.getNearestDueDateForList(id)
+                lists.add(TodoListData(id, name, counts.first, counts.second, nearestDueDate))
             }
             cursor.close()
             db.close()
@@ -249,6 +259,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
 @Composable
 fun TodoListApp(
     todoLists: List<TodoListData>,
@@ -284,6 +295,15 @@ fun TodoListApp(
                                     tint = Color(0xFFFFC0CB)
                                 )
                             }
+                        }
+
+                        list.nearestDueDate?.let { dueDate ->
+                            Text(
+                                text = "Nearest Due Date: $dueDate",
+                                modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                         Text(text = "${list.completedCount}/${list.itemCount}")
 
