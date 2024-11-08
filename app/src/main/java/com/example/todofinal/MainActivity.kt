@@ -96,11 +96,11 @@ class MainActivity : ComponentActivity() {
                     intent.putExtra("due_date", dueDate)
                     editItemLauncher.launch(intent)
                 },
-                onToggleItemCompletion = { itemId, isCompleted ->
-                    toggleItemCompletion(itemId, isCompleted)
-                },
                 onDeleteTodoItemClicked = { itemId ->
                     deleteTodoItem(itemId)
+                },
+                onToggleItemCompletion = { itemId, isCompleted ->
+                    toggleItemCompletion(itemId, isCompleted)
                 }
             )
         }
@@ -133,25 +133,9 @@ class MainActivity : ComponentActivity() {
             }
 
             loadTodoItems()
+            loadTodoLists()
         } catch (e: Exception) {
             Log.e("MainActivity", "Error toggling item completion: ${e.message}")
-        }
-    }
-
-    internal fun deleteTodoItem(itemId: Int) {
-        try {
-            val dbHelper = TodoDatabaseHelper(this@MainActivity)
-            val isDeleted = dbHelper.deleteTodoItem(itemId)
-
-            if (isDeleted) {
-                Log.d("MainActivity", "Deleted item with ID: $itemId")
-            } else {
-                Log.w("MainActivity", "No item deleted for ID: $itemId")
-            }
-
-            loadTodoItems()
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Error deleting item: ${e.message}")
         }
     }
 
@@ -216,6 +200,31 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Error loading todo items: ${e.message}")
         }
     }
+
+    internal fun deleteTodoItem(itemId: Int) {
+        try {
+            val dbHelper = TodoDatabaseHelper(this@MainActivity)
+            val db = dbHelper.writableDatabase
+
+            val rowsDeleted = db.delete(
+                TodoDatabaseHelper.TABLE_TODO_ITEM,
+                "${TodoDatabaseHelper.COLUMN_ID} = ?",
+                arrayOf(itemId.toString())
+            )
+            db.close()
+
+            if (rowsDeleted > 0) {
+                Log.d("MainActivity", "Deleted item ID: $itemId")
+            } else {
+                Log.w("MainActivity", "No item deleted for ID: $itemId")
+            }
+
+            loadTodoItems()
+            loadTodoLists()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error deleting item: ${e.message}")
+        }
+    }
 }
 
 @Composable
@@ -226,8 +235,8 @@ fun TodoListApp(
     onAddTodoItemClicked: (Int) -> Unit,
     onEditTodoListClicked: (Int, String) -> Unit,
     onEditTodoItemClicked: (Int, String, String?) -> Unit,
-    onToggleItemCompletion: (Int, Boolean) -> Unit,
-    onDeleteTodoItemClicked: (Int) -> Unit
+    onDeleteTodoItemClicked: (Int) -> Unit,
+    onToggleItemCompletion: (Int, Boolean) -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -246,7 +255,7 @@ fun TodoListApp(
                                 )
                             }
                         }
-                        Text(text = "Items: ${list.itemCount}, Completed: ${list.completedCount}")
+                        Text(text = "${list.completedCount}/${list.itemCount}")
 
                         todoItems.filter { it.listId == list.id.toString() }.forEach { item ->
                             Row(
