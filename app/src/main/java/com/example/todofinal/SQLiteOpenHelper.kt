@@ -1,4 +1,5 @@
 package com.example.todofinal
+
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
@@ -9,7 +10,7 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
 
     companion object {
         private const val DATABASE_NAME = "todolist.db"
-        private const val DATABASE_VERSION = 4
+        private const val DATABASE_VERSION = 5
         const val TABLE_TODO_LIST = "todolist"
         const val TABLE_TODO_ITEM = "todoitem"
         const val COLUMN_ID = "_id"
@@ -43,18 +44,23 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         onCreate(db)
     }
 
+
     fun isListNameDuplicate(listName: String): Boolean {
         val db = readableDatabase
         val cursor = db.rawQuery(
             "SELECT COUNT(*) FROM $TABLE_TODO_LIST WHERE $COLUMN_NAME = ?",
             arrayOf(listName)
         )
-        cursor.moveToFirst()
-        val count = cursor.getInt(0)
+        var isDuplicate = false
+        if (cursor.moveToFirst()) {
+            val count = cursor.getInt(0)
+            isDuplicate = count > 0
+        }
         cursor.close()
         db.close()
-        return count > 0
+        return isDuplicate
     }
+
 
     fun getItemCountsForList(listId: Int): Pair<Int, Int> {
         val db = readableDatabase
@@ -83,6 +89,7 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         return Pair(totalItems, completedItems)
     }
 
+
     fun updateTodoItem(itemId: Int, newItemName: String, newDueDate: String?): Boolean {
         val db = writableDatabase
         val values = ContentValues().apply {
@@ -90,39 +97,54 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
             put(COLUMN_DUE_DATE, newDueDate)
         }
 
-        val rowsAffected = db.update(
-            TABLE_TODO_ITEM,
-            values,
-            "$COLUMN_ID = ?",
-            arrayOf(itemId.toString())
-        )
-        db.close()
-
-        if (rowsAffected > 0) {
-            Log.d("TodoDatabaseHelper", "Successfully updated item: $newItemName with ID: $itemId")
-        } else {
-            Log.e("TodoDatabaseHelper", "Failed to update item with ID: $itemId")
+        return try {
+            val rowsAffected = db.update(
+                TABLE_TODO_ITEM,
+                values,
+                "$COLUMN_ID = ?",
+                arrayOf(itemId.toString())
+            )
+            if (rowsAffected > 0) {
+                Log.d("TodoDatabaseHelper", "Successfully updated item: $newItemName with ID: $itemId")
+                true
+            } else {
+                Log.w("TodoDatabaseHelper", "No rows updated for item with ID: $itemId")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e("TodoDatabaseHelper", "Error updating item with ID: $itemId", e)
+            false
+        } finally {
+            db.close()
         }
-
-        return rowsAffected > 0
     }
 
 
-    fun deleteTodoItem(itemId: Int): Boolean {
+    fun moveTodoItem(itemId: Int, newListId: Int): Boolean {
         val db = writableDatabase
-        val rowsAffected = db.delete(
-            TABLE_TODO_ITEM,
-            "$COLUMN_ID = ?",
-            arrayOf(itemId.toString())
-        )
-        db.close()
-
-        if (rowsAffected > 0) {
-            Log.d("TodoDatabaseHelper", "Successfully deleted item with ID: $itemId")
-        } else {
-            Log.e("TodoDatabaseHelper", "Failed to delete item with ID: $itemId")
+        val values = ContentValues().apply {
+            put(COLUMN_LIST_ID, newListId)
         }
 
-        return rowsAffected > 0
+        return try {
+            val rowsAffected = db.update(
+                TABLE_TODO_ITEM,
+                values,
+                "$COLUMN_ID = ?",
+                arrayOf(itemId.toString())
+            )
+            if (rowsAffected > 0) {
+                Log.d("TodoDatabaseHelper", "Successfully moved item with ID: $itemId to new list ID: $newListId")
+                true
+            } else {
+                Log.w("TodoDatabaseHelper", "No rows updated while moving item with ID: $itemId")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e("TodoDatabaseHelper", "Error moving item with ID: $itemId", e)
+            false
+        } finally {
+            db.close()
+        }
     }
 }

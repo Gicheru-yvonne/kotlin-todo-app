@@ -8,21 +8,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 
 data class TodoItem(
     val id: Int,
@@ -101,6 +99,9 @@ class MainActivity : ComponentActivity() {
                 },
                 onToggleItemCompletion = { itemId, isCompleted ->
                     toggleItemCompletion(itemId, isCompleted)
+                },
+                onMoveTodoItemClicked = { itemId, targetListId ->
+                    moveTodoItem(itemId, targetListId)
                 }
             )
         }
@@ -149,17 +150,13 @@ class MainActivity : ComponentActivity() {
             )
 
             val lists = mutableListOf<TodoListData>()
-            if (cursor != null) {
-                while (cursor.moveToNext()) {
-                    val id = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
-                    val name = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_NAME))
-                    val counts = dbHelper.getItemCountsForList(id)
-                    lists.add(TodoListData(id, name, counts.first, counts.second))
-                }
-                cursor.close()
-            } else {
-                Log.e("MainActivity", "Cursor is null while loading todo lists")
+            while (cursor.moveToNext()) {
+                val id = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
+                val name = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_NAME))
+                val counts = dbHelper.getItemCountsForList(id)
+                lists.add(TodoListData(id, name, counts.first, counts.second))
             }
+            cursor.close()
             db.close()
 
             todoLists = lists
@@ -178,21 +175,16 @@ class MainActivity : ComponentActivity() {
             )
 
             val items = mutableListOf<TodoItem>()
-            if (cursor != null) {
-                Log.d("MainActivity", "Cursor loaded with item count: ${cursor.count}")
-                while (cursor.moveToNext()) {
-                    val itemId = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
-                    val itemName = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ITEM_NAME)) ?: continue
-                    val listId = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_LIST_ID)) ?: continue
-                    val dueDate = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_DUE_DATE))
-                    val isCompleted = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_COMPLETED)) == 1
+            while (cursor.moveToNext()) {
+                val itemId = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
+                val itemName = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ITEM_NAME))
+                val listId = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_LIST_ID))
+                val dueDate = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_DUE_DATE))
+                val isCompleted = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_COMPLETED)) == 1
 
-                    items.add(TodoItem(itemId, itemName, listId, dueDate, isCompleted))
-                }
-                cursor.close()
-            } else {
-                Log.e("MainActivity", "Cursor is null while loading todo items")
+                items.add(TodoItem(itemId, itemName, listId, dueDate, isCompleted))
             }
+            cursor.close()
             db.close()
 
             todoItems = items
@@ -225,6 +217,36 @@ class MainActivity : ComponentActivity() {
             Log.e("MainActivity", "Error deleting item: ${e.message}")
         }
     }
+
+    internal fun moveTodoItem(itemId: Int, targetListId: Int) {
+        try {
+            val dbHelper = TodoDatabaseHelper(this@MainActivity)
+            val db = dbHelper.writableDatabase
+
+            val values = ContentValues().apply {
+                put(TodoDatabaseHelper.COLUMN_LIST_ID, targetListId)
+            }
+
+            val rowsAffected = db.update(
+                TodoDatabaseHelper.TABLE_TODO_ITEM,
+                values,
+                "${TodoDatabaseHelper.COLUMN_ID} = ?",
+                arrayOf(itemId.toString())
+            )
+            db.close()
+
+            if (rowsAffected > 0) {
+                Log.d("MainActivity", "Moved item ID: $itemId to list ID: $targetListId")
+            } else {
+                Log.w("MainActivity", "No rows updated for item ID: $itemId")
+            }
+
+            loadTodoItems()
+            loadTodoLists()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error moving item: ${e.message}")
+        }
+    }
 }
 
 @Composable
@@ -236,8 +258,12 @@ fun TodoListApp(
     onEditTodoListClicked: (Int, String) -> Unit,
     onEditTodoItemClicked: (Int, String, String?) -> Unit,
     onDeleteTodoItemClicked: (Int) -> Unit,
-    onToggleItemCompletion: (Int, Boolean) -> Unit
+    onToggleItemCompletion: (Int, Boolean) -> Unit,
+    onMoveTodoItemClicked: (Int, Int) -> Unit
 ) {
+    var showMoveDialog by remember { mutableStateOf(false) }
+    var itemToMove by remember { mutableStateOf(0) }
+
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Todo Lists", style = MaterialTheme.typography.headlineMedium)
@@ -246,7 +272,11 @@ fun TodoListApp(
                 items(todoLists) { list ->
                     Column(modifier = Modifier.padding(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = list.name)
+                            Text(
+                                text = list.name,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
                             IconButton(onClick = { onEditTodoListClicked(list.id, list.name) }) {
                                 Icon(
                                     imageVector = Icons.Filled.Edit,
@@ -258,37 +288,70 @@ fun TodoListApp(
                         Text(text = "${list.completedCount}/${list.itemCount}")
 
                         todoItems.filter { it.listId == list.id.toString() }.forEach { item ->
-                            Row(
-                                modifier = Modifier.padding(start = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                modifier = Modifier
+                                    .padding(start = 16.dp)
+                                    .fillMaxWidth()
                             ) {
-                                Checkbox(
-                                    checked = item.isCompleted,
-                                    onCheckedChange = { isChecked ->
-                                        onToggleItemCompletion(item.id, isChecked)
-                                    }
-                                )
                                 Text(
-                                    text = "${item.name} (Due: ${item.dueDate ?: "No due date"})",
+                                    text = item.name,
                                     modifier = Modifier.padding(start = 8.dp)
                                 )
-                                IconButton(onClick = {
-                                    onEditTodoItemClicked(item.id, item.name, item.dueDate)
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Edit,
-                                        contentDescription = "Edit Item",
-                                        tint = Color(0xFFFFC0CB)
+                                item.dueDate?.let { dueDate ->
+                                    Text(
+                                        text = "Due: $dueDate",
+                                        modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+                                        color = Color.Gray,
+                                        style = MaterialTheme.typography.bodySmall
                                     )
                                 }
-                                IconButton(onClick = {
-                                    onDeleteTodoItemClicked(item.id)
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Delete,
-                                        contentDescription = "Delete Item",
-                                        tint = Color.Red
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Checkbox(
+                                        checked = item.isCompleted,
+                                        onCheckedChange = { isChecked ->
+                                            onToggleItemCompletion(item.id, isChecked)
+                                        }
                                     )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = {
+                                            onEditTodoItemClicked(item.id, item.name, item.dueDate)
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Edit,
+                                                contentDescription = "Edit Item",
+                                                tint = Color(0xFFFFC0CB)
+                                            )
+                                        }
+                                        IconButton(onClick = {
+                                            onDeleteTodoItemClicked(item.id)
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Delete,
+                                                contentDescription = "Delete Item",
+                                                tint = Color.Red
+                                            )
+                                        }
+                                        Button(
+                                            onClick = {
+                                                showMoveDialog = true
+                                                itemToMove = item.id
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color(0xFFFFC0CB),
+                                                contentColor = Color.Black
+                                            ),
+                                            modifier = Modifier
+                                                .padding(start = 8.dp)
+                                                .width(80.dp)
+                                                .height(40.dp)
+                                        ) {
+                                            Text("Move")
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -304,5 +367,33 @@ fun TodoListApp(
                 Text("Add New Todo List")
             }
         }
+    }
+
+    if (showMoveDialog) {
+        AlertDialog(
+            onDismissRequest = { showMoveDialog = false },
+            title = { Text("Move Item") },
+            text = {
+                Column {
+                    Text("Select the list to move item to:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    todoLists.filter { it.id != todoItems.find { it.id == itemToMove }?.listId?.toInt() }.forEach { targetList ->
+                        Button(onClick = {
+                            onMoveTodoItemClicked(itemToMove, targetList.id)
+                            showMoveDialog = false
+                        }, modifier = Modifier
+                            .padding(vertical = 4.dp)
+                            .fillMaxWidth()) {
+                            Text(targetList.name)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showMoveDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
