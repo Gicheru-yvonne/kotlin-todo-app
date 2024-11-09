@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,7 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
+import java.text.SimpleDateFormat
+import java.util.*
 
 data class TodoItem(
     val id: Int,
@@ -36,7 +38,9 @@ data class TodoListData(
     val name: String,
     val itemCount: Int,
     val completedCount: Int,
-    val nearestDueDate: String?
+    val nearestDueDate: String?,
+    val hasOverdueItems: Boolean = false,
+    val hasItemsDueToday: Boolean = false
 )
 
 class MainActivity : ComponentActivity() {
@@ -119,36 +123,6 @@ class MainActivity : ComponentActivity() {
         loadTodoItems()
     }
 
-    internal fun toggleItemCompletion(itemId: Int, isCompleted: Boolean) {
-        try {
-            val dbHelper = TodoDatabaseHelper(this@MainActivity)
-            val db = dbHelper.writableDatabase
-
-            val values = ContentValues().apply {
-                put(TodoDatabaseHelper.COLUMN_COMPLETED, if (isCompleted) 1 else 0)
-            }
-
-            val rowsAffected = db.update(
-                TodoDatabaseHelper.TABLE_TODO_ITEM,
-                values,
-                "${TodoDatabaseHelper.COLUMN_ID} = ?",
-                arrayOf(itemId.toString())
-            )
-            db.close()
-
-            if (rowsAffected > 0) {
-                Log.d("MainActivity", "Updated item ID: $itemId, completed: $isCompleted")
-            } else {
-                Log.w("MainActivity", "No rows updated for item ID: $itemId")
-            }
-
-            loadTodoItems()
-            loadTodoLists()
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Error toggling item completion: ${e.message}")
-        }
-    }
-
     internal fun loadTodoLists() {
         try {
             val dbHelper = TodoDatabaseHelper(this@MainActivity)
@@ -159,15 +133,36 @@ class MainActivity : ComponentActivity() {
             )
 
             val lists = mutableListOf<TodoListData>()
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
             while (cursor.moveToNext()) {
                 val id = cursor.getInt(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_ID))
                 val name = cursor.getString(cursor.getColumnIndexOrThrow(TodoDatabaseHelper.COLUMN_NAME))
                 val counts = dbHelper.getItemCountsForList(id)
                 val nearestDueDate = dbHelper.getNearestDueDateForList(id)
-                lists.add(TodoListData(id, name, counts.first, counts.second, nearestDueDate))
+
+
+                val hasOverdueItems = dbHelper.hasOverdueItems(id)
+                val hasItemsDueToday = dbHelper.hasItemDueToday(id)
+
+
+                val displayDueDate = nearestDueDate ?: "None"
+
+                lists.add(
+                    TodoListData(
+                        id,
+                        name,
+                        counts.first,
+                        counts.second,
+                        displayDueDate,
+                        hasOverdueItems,
+                        hasItemsDueToday
+                    )
+                )
             }
             cursor.close()
             db.close()
+
 
             todoLists = lists
         } catch (e: Exception) {
@@ -221,10 +216,42 @@ class MainActivity : ComponentActivity() {
                 Log.w("MainActivity", "No item deleted for ID: $itemId")
             }
 
+
             loadTodoItems()
             loadTodoLists()
         } catch (e: Exception) {
             Log.e("MainActivity", "Error deleting item: ${e.message}")
+        }
+    }
+
+    internal fun toggleItemCompletion(itemId: Int, isCompleted: Boolean) {
+        try {
+            val dbHelper = TodoDatabaseHelper(this@MainActivity)
+            val db = dbHelper.writableDatabase
+
+            val values = ContentValues().apply {
+                put(TodoDatabaseHelper.COLUMN_COMPLETED, if (isCompleted) 1 else 0)
+            }
+
+            val rowsAffected = db.update(
+                TodoDatabaseHelper.TABLE_TODO_ITEM,
+                values,
+                "${TodoDatabaseHelper.COLUMN_ID} = ?",
+                arrayOf(itemId.toString())
+            )
+            db.close()
+
+            if (rowsAffected > 0) {
+                Log.d("MainActivity", "Updated item ID: $itemId, completed: $isCompleted")
+            } else {
+                Log.w("MainActivity", "No rows updated for item ID: $itemId")
+            }
+
+
+            loadTodoItems()
+            loadTodoLists()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error toggling item completion: ${e.message}")
         }
     }
 
@@ -250,6 +277,7 @@ class MainActivity : ComponentActivity() {
             } else {
                 Log.w("MainActivity", "No rows updated for item ID: $itemId")
             }
+
 
             loadTodoItems()
             loadTodoLists()
@@ -281,7 +309,19 @@ fun TodoListApp(
 
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(todoLists) { list ->
-                    Column(modifier = Modifier.padding(8.dp)) {
+                    val listBackgroundColor = when {
+                        list.hasOverdueItems -> Color(0xFFFF7F7F)
+                        list.hasItemsDueToday -> Color.Yellow
+                        else -> Color.White
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .fillMaxWidth()
+                            .background(listBackgroundColor)
+                            .padding(8.dp)
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = list.name,
@@ -297,14 +337,12 @@ fun TodoListApp(
                             }
                         }
 
-                        list.nearestDueDate?.let { dueDate ->
-                            Text(
-                                text = "Nearest Due Date: $dueDate",
-                                modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
-                                color = Color.Gray,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
+                        Text(
+                            text = "Nearest Due Date: ${list.nearestDueDate}",
+                            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp),
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                         Text(text = "${list.completedCount}/${list.itemCount}")
 
                         todoItems.filter { it.listId == list.id.toString() }.forEach { item ->

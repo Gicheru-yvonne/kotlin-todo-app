@@ -15,12 +15,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import java.text.SimpleDateFormat
 import java.util.*
 
 class AddTodoItemActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
 
         val listId = intent.getIntExtra("list_id", -1)
         if (listId == -1) {
@@ -32,7 +32,6 @@ class AddTodoItemActivity : ComponentActivity() {
         setContent {
             AddTodoItemScreen { itemName, dueDate ->
                 if (itemName.isNotBlank()) {
-
                     val dbHelper = TodoDatabaseHelper(this)
                     val db = dbHelper.writableDatabase
 
@@ -61,18 +60,25 @@ class AddTodoItemActivity : ComponentActivity() {
     }
 }
 
+
+fun formatDateToString(date: Date): String {
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    return dateFormat.format(date)
+}
+
 @Composable
-fun AddTodoItemScreen(onSaveClick: (String, String) -> Unit) {
+fun AddTodoItemScreen(onSaveClick: (String, String?) -> Unit) {
     val context = LocalContext.current
     var itemName by remember { mutableStateOf("") }
-    var dueDate by remember { mutableStateOf("") }
+    var dueDate by remember { mutableStateOf<String?>(null) }
     val calendar = Calendar.getInstance()
-
 
     val datePickerDialog = DatePickerDialog(
         context,
         { _, year, month, dayOfMonth ->
-            dueDate = "$year-${month + 1}-$dayOfMonth"
+            calendar.set(year, month, dayOfMonth)
+
+            dueDate = formatDateToString(calendar.time)
         },
         calendar.get(Calendar.YEAR),
         calendar.get(Calendar.MONTH),
@@ -88,7 +94,7 @@ fun AddTodoItemScreen(onSaveClick: (String, String) -> Unit) {
             label = { Text("Item Name") }
         )
         OutlinedTextField(
-            value = dueDate,
+            value = dueDate ?: "",
             onValueChange = {},
             label = { Text("Due Date (optional)") },
             enabled = false,

@@ -46,14 +46,13 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         onCreate(db)
     }
 
-
     fun getNearestDueDateForList(listId: Int): String? {
         val db = readableDatabase
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         var nearestDate: Date? = null
 
         val cursor = db.rawQuery(
-            "SELECT $COLUMN_DUE_DATE FROM $TABLE_TODO_ITEM WHERE $COLUMN_LIST_ID = ? AND $COLUMN_DUE_DATE IS NOT NULL",
+            "SELECT $COLUMN_DUE_DATE FROM $TABLE_TODO_ITEM WHERE $COLUMN_LIST_ID = ? AND $COLUMN_DUE_DATE IS NOT NULL AND $COLUMN_COMPLETED = 0",
             arrayOf(listId.toString())
         )
 
@@ -74,6 +73,62 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         return nearestDate?.let { dateFormat.format(it) }
     }
 
+    fun hasItemDueToday(listId: Int): Boolean {
+        val db = readableDatabase
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val todayStr = dateFormat.format(Date())
+
+        val cursor = db.rawQuery(
+            "SELECT COUNT(*) FROM $TABLE_TODO_ITEM WHERE $COLUMN_LIST_ID = ? AND $COLUMN_DUE_DATE = ? AND $COLUMN_COMPLETED = 0",
+            arrayOf(listId.toString(), todayStr)
+        )
+
+        val hasDueToday = if (cursor.moveToFirst()) {
+            cursor.getInt(0) > 0
+        } else {
+            false
+        }
+
+        cursor.close()
+        db.close()
+        return hasDueToday
+    }
+
+    fun hasOverdueItems(listId: Int): Boolean {
+        val db = readableDatabase
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val todayDate = Calendar.getInstance()
+        todayDate.set(Calendar.HOUR_OF_DAY, 0)
+        todayDate.set(Calendar.MINUTE, 0)
+        todayDate.set(Calendar.SECOND, 0)
+        todayDate.set(Calendar.MILLISECOND, 0)
+        val todayStr = dateFormat.format(todayDate.time)
+
+        val cursor = db.rawQuery(
+            "SELECT $COLUMN_DUE_DATE FROM $TABLE_TODO_ITEM WHERE $COLUMN_LIST_ID = ? AND $COLUMN_COMPLETED = 0",
+            arrayOf(listId.toString())
+        )
+
+        var hasOverdueItems = false
+        while (cursor.moveToNext()) {
+            val dueDateStr = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_DUE_DATE))
+            if (!dueDateStr.isNullOrEmpty()) {
+                try {
+                    val dueDate = dateFormat.parse(dueDateStr)
+                    if (dueDate != null && dueDate.before(todayDate.time)) {
+                        hasOverdueItems = true
+                        break
+                    }
+                } catch (e: Exception) {
+                    Log.e("TodoDatabaseHelper", "Error parsing date: $dueDateStr", e)
+                }
+            }
+        }
+
+        cursor.close()
+        db.close()
+        return hasOverdueItems
+    }
 
     fun isListNameDuplicate(listName: String): Boolean {
         val db = readableDatabase
@@ -81,10 +136,10 @@ class TodoDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
             "SELECT COUNT(*) FROM $TABLE_TODO_LIST WHERE $COLUMN_NAME = ?",
             arrayOf(listName)
         )
-        var isDuplicate = false
-        if (cursor.moveToFirst()) {
-            val count = cursor.getInt(0)
-            isDuplicate = count > 0
+        val isDuplicate = if (cursor.moveToFirst()) {
+            cursor.getInt(0) > 0
+        } else {
+            false
         }
         cursor.close()
         db.close()

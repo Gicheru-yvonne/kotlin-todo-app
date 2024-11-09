@@ -20,7 +20,6 @@ class EditTodoItemActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-
         val itemId = intent.getIntExtra("item_id", -1)
         val itemName = intent.getStringExtra("item_name") ?: ""
         val dueDate = intent.getStringExtra("due_date") ?: ""
@@ -46,18 +45,16 @@ class EditTodoItemActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
 fun EditTodoItemScreen(
     itemName: String,
     currentDueDate: String,
-    onSaveClick: (String, String) -> Unit
+    onSaveClick: (String, String?) -> Unit
 ) {
     val context = LocalContext.current
     var newItemName by remember { mutableStateOf(itemName) }
     var dueDate by remember { mutableStateOf(currentDueDate) }
     val calendar = Calendar.getInstance()
-
 
     if (currentDueDate.isNotBlank()) {
         val parts = currentDueDate.split("-")
@@ -66,28 +63,25 @@ fun EditTodoItemScreen(
         }
     }
 
-
     val datePickerDialog = DatePickerDialog(
         context,
         { _, year, month, dayOfMonth ->
-            dueDate = "$year-${month + 1}-$dayOfMonth"
+            calendar.set(year, month, dayOfMonth)
+            dueDate = formatDateToString(calendar.time)
         },
         calendar.get(Calendar.YEAR),
         calendar.get(Calendar.MONTH),
         calendar.get(Calendar.DAY_OF_MONTH)
     ).apply {
-
         datePicker.minDate = Calendar.getInstance().timeInMillis
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
-
         OutlinedTextField(
             value = newItemName,
             onValueChange = { newItemName = it },
             label = { Text("Todo Item Name") }
         )
-
 
         OutlinedTextField(
             value = dueDate,
@@ -97,14 +91,12 @@ fun EditTodoItemScreen(
             modifier = Modifier.padding(top = 16.dp)
         )
 
-
         Button(
             onClick = { datePickerDialog.show() },
             modifier = Modifier.padding(top = 8.dp)
         ) {
             Text("Select Due Date")
         }
-
 
         Button(
             onClick = {
