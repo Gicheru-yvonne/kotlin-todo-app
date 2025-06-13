@@ -1,0 +1,83 @@
+[33mcommit cd88036a66d5836231f7fac60bf786ec2b1219d3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Sat Nov 9 13:08:32 2024 +0000
+
+    Finish group 4 tasks.
+
+[33mcommit adc4fd9d7fd913f1151164a2f8705a3798587e29[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Fri Nov 8 18:51:10 2024 +0000
+
+    Add nearest item due for each list
+
+[33mcommit 9af7c2f3c0c4c0f7efcb4fc05027544b3079b6b0[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Fri Nov 8 18:01:52 2024 +0000
+
+    Added functional move button
+
+[33mcommit 3cb97ab158936456a5ac2a64d2b9c9fd3a9c4526[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Fri Nov 8 14:08:19 2024 +0000
+
+    Add live counters
+
+[33mcommit 558b3080a7c1b901efc584a6c7a30f002cd7445e[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Fri Nov 8 13:29:51 2024 +0000
+
+    Add delete icon
+
+[33mcommit abe57defaea2dc96b043824ad34bb2bd91a0111a[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Fri Nov 8 13:10:55 2024 +0000
+
+    Add edit icon to list and item
+
+[33mcommit 7208a8b95c7d6c3bc01dea9d043b8ef0798d8afe[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Thu Nov 7 14:42:44 2024 +0000
+
+    finish group 2 checkbox
+
+[33mcommit e55734c9059bc66cc76c8be346d08a567b3de696[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Thu Nov 7 13:00:00 2024 +0000
+
+    Add changes group 2
+
+[33mcommit 06746940b6c6ff8bd995a615006a218e3882abc9[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Thu Nov 7 11:12:57 2024 +0000
+
+    Add an item button
+
+[33mcommit 09040a99af01efc03764b340ac1bf8ed7022bd25[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Wed Nov 6 22:15:57 2024 +0000
+
+    adding new lists
+
+[33mcommit f754ab28ddd9864c6eaa8c0431a3a4d405ed26e5[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Wed Nov 6 11:02:43 2024 +0000
+
+    do group 1
+
+[33mcommit be2df9caa91f4e62306168dc1e46c29f12dffbb9[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Wed Nov 6 09:03:40 2024 +0000
+
+     AddTodolistActivity
+
+[33mcommit eca6e3f22aca6fce2acfeae66e955ae2503c1c3c[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Wed Nov 6 08:50:46 2024 +0000
+
+    Add sql helper
+
+[33mcommit f5069acb1fc0dcc985175636e37c02d9f9bd093a[m
+Author: Yvonne <rhinevicer@gmail.com>
+Date:   Wed Nov 6 08:50:01 2024 +0000
+
+    Add sql helper
